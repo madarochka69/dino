@@ -675,8 +675,8 @@ async def watch_best(args: argparse.Namespace, config: neat.Config) -> None:
         raise SystemExit(f"No saved best genome at {BEST_PATH}")
     if getattr(best, "fitness_mode", None) != FITNESS_MODE:
         print(
-            "  warning: this best genome was trained with score-only fitness; "
-            "it may still duck constantly. Train a new run to get the ducking fitness.",
+            f"  warning: this best genome uses fitness mode {getattr(best, 'fitness_mode', 'score-only')!r}, "
+            f"not {FITNESS_MODE}; it may have been trained with an older objective.",
             flush=True,
         )
     print(
