@@ -35,13 +35,13 @@ HISTORY_PATH = CHECKPOINT_DIR / "history.csv"
 
 # The score-only fitness rewards a degenerate policy: duck forever and jump
 # when an obstacle gets close. This shaped fitness adds small rewards for the
-# actions that actually keep the dino alive, without taking control away from
-# the network. PTERO_DUCK_BONUS is per mid-height pterodactyl passed while
-# ducking. --episode-timeout defaults to 1800s (about 35k points at max speed);
-# a 300s run ends near 5280 points, which is the episode limit, not a freeze.
-FITNESS_MODE = "ducking-v1"
+# actions that keep the dino alive. Useful duck frames only count within 200 px
+# and pass credit uses the pre-action pose; PTERO_DUCK_BONUS is per mid-height
+# pterodactyl. --episode-timeout defaults to 1800s (about 35k points); a 300s
+# run ends near 5280 points, which is the episode limit, not a freeze.
+FITNESS_MODE = "ducking-v2"
 DUCK_REWARD_PER_FRAME = 2.0
-USELESS_DUCK_PENALTY_PER_FRAME = 0.1
+USELESS_DUCK_PENALTY_PER_FRAME = 0.25
 BAD_JUMP_PENALTY_PER_FRAME = 0.5
 USELESS_JUMP_PENALTY_PER_FRAME = 0.05
 PTERO_DUCK_BONUS = 50.0
@@ -443,8 +443,8 @@ def load_current_best() -> neat.DefaultGenome | None:
     if getattr(best, "fitness_mode", None) != FITNESS_MODE:
         archive_legacy_best()
         print(
-            "  saved best uses the old score-only fitness; "
-            "it will not be reinserted into the ducking run.",
+            f"  saved best uses fitness mode {getattr(best, 'fitness_mode', 'score-only')!r}; "
+            f"it will not be reinserted into the {FITNESS_MODE} run.",
             flush=True,
         )
         return None
@@ -488,7 +488,7 @@ HISTORY_FIELDS = (
     "generation,best_key,best_score,best_fitness,best_passed,best_duck_pct,"
     "best_ptero_ducked,best_ptero_duckable,best_ptero_passed,mean_score,"
     "mean_fitness,evaluated,species,global_best_fitness,global_best_score,"
-    "seconds,time"
+    "seconds,time,fitness_mode"
 ).split(",")
 
 def save_history(
@@ -530,7 +530,7 @@ def save_history(
             f"{mean_raw:.1f}", f"{mean_fitness:.1f}", evaluated, species_count,
             f"{global_best.fitness:.1f}" if global_best else "",
             f"{raw(global_best):.0f}" if global_best else "",
-            f"{elapsed:.1f}", time.strftime("%Y-%m-%d %H:%M:%S"),
+            f"{elapsed:.1f}", time.strftime("%Y-%m-%d %H:%M:%S"), FITNESS_MODE,
         ])
 
 async def train(args: argparse.Namespace, config: neat.Config) -> None:
@@ -540,7 +540,7 @@ async def train(args: argparse.Namespace, config: neat.Config) -> None:
         global_best = load_current_best()
         if global_best is None and BEST_PATH.exists():
             print(
-                "  saved best is from the old score-only fitness and will not be "
+                "  saved best uses an older fitness mode and will not be "
                 f"reinserted; the population is re-evaluated with {FITNESS_MODE} fitness.",
                 flush=True,
             )
@@ -737,7 +737,7 @@ FLAGS = [
     ("--games", dict(type=int, default=15, help="parallel Chromium browsers (default: 15)")),
     ("--generations", dict(type=int, default=100, help="total number of generations (default: 100)")),
     ("--episode-timeout", dict(type=float, default=1800.0, help="maximum seconds per episode; 0 = no limit (default: 1800, about 35k points)")),
-    ("--episodes", dict(type=int, default=2, help="episodes per genome, averaged to reduce luck (default: 2)")),
+    ("--episodes", dict(type=int, default=3, help="episodes per genome, averaged to reduce luck; use 2 for a faster but noisier run (default: 3)")),
     ("--visible", dict(action="store_true", help="show browser windows (only the first --visible-games are visible)")),
     ("--visible-games", dict(type=int, default=4, help="number of games to show when --visible is used (default: 4)")),
     ("--browser", dict(choices=("chromium", "chrome", "msedge"), default="chromium", help="browser channel: Playwright chromium, installed Chrome or Edge")),

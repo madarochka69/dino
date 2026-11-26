@@ -10,6 +10,11 @@
 
   const clamp = (value) => Math.max(0, Math.min(1, value));
 
+  // A duck only counts as useful when the pterodactyl is close enough that
+  // ducking is the actual answer. The old 400 px window rewarded ducking
+  // during the whole approach, even when the network then jumped over it.
+  const DUCK_REWARD_DISTANCE = 200;
+
   // The two nearest obstacles that are not completely behind the dino.
   const obstaclesAhead = () => {
     const trex = runner.tRex;
@@ -92,6 +97,8 @@
     },
 
     // The config fixes activation to tanh and aggregation to sum.
+    // neat-python's tanh_activation is tanh(2.5 * z) with z clamped to
+    // [-60, 60]; use the same function here so the page and Python agree.
     activate(inputs) {
       const net = this.net;
       const values = {};
@@ -103,7 +110,8 @@
         for (const [source, weight] of node.links) {
           sum += (values[source] || 0) * weight;
         }
-        values[node.id] = Math.tanh(node.bias + node.resp * sum);
+        const z = 2.5 * (node.bias + node.resp * sum);
+        values[node.id] = Math.tanh(Math.max(-60, Math.min(60, z)));
       }
       return net.outputs.map((id) => values[id]);
     },
@@ -118,6 +126,11 @@
       this.frames++;
       const [jump, duck, idle] = this.activate(this.sense());
       const trex = runner.tRex;
+      // The game moved the obstacles during the update before this action.
+      // Track the pose that was actually active during that update, otherwise
+      // a pterodactyl passed while ducking is lost when the action switches
+      // to idle/jump on the same frame.
+      const wasDucking = trex.ducking;
 
       let action = "idle";
       if (jump >= duck && jump >= idle) action = "jump";
@@ -131,13 +144,15 @@
       // pterodactyls (yPos 75) are ducked; high ones (yPos 50) are run under.
       const first = obstaclesAhead()[0];
       const near = !!first &&
-        first.xPos - trex.xPos <= 400 &&
+        first.xPos - trex.xPos <= DUCK_REWARD_DISTANCE &&
         first.xPos + first.width >= trex.xPos;
       const ptero = near && first.typeConfig.type === "PTERODACTYL" ? first : null;
       const duckable = !!ptero && ptero.yPos >= 60 && ptero.yPos < 90;
       const safeHigh = !!ptero && ptero.yPos <= 60;
       if (action === "duck") {
-        if (duckable) this.useful_duck_frames++;
+        // Ducking while airborne is a speed drop, not a duck under the
+        // pterodactyl; do not pay the useful-duck reward for it.
+        if (duckable && !trex.jumping) this.useful_duck_frames++;
         else this.useless_duck_frames++;
       } else if (action === "jump") {
         if (duckable) this.bad_jump_frames++;
@@ -148,8 +163,12 @@
       // duck is "duck / speed-drop". Holding jump keeps the jump going.
       // A speed drop is a one-shot action: setSpeedDrop() resets jumpVelocity
       // to 1, so calling it every frame would hold the dino in a slow float
-      // instead of letting the native 3x drop accelerate.
+      // instead of letting the native 3x drop accelerate. Releasing duck also
+      // clears speedDrop, exactly like the game's duck keyup handler.
       if (action === "jump") {
+        // Jump is pressed, so duck is released. Native onKeyUp for duck
+        // clears speedDrop; do the same before starting a jump.
+        if (trex.speedDrop) trex.speedDrop = false;
         if (trex.ducking) trex.setDuck(false);
         if (!trex.jumping) trex.startJump(runner.currentSpeed);
       } else if (action === "duck") {
@@ -160,13 +179,16 @@
         }
       } else {
         if (trex.jumping) trex.endJump();
-        else if (trex.ducking) trex.setDuck(false);
+        // Both keys are released in the idle action; native duck keyup
+        // clears speedDrop even while the dino is still in the air.
+        if (trex.speedDrop) trex.speedDrop = false;
+        if (trex.ducking) trex.setDuck(false);
       }
 
-      this.trackPassed();
+      this.trackPassed(wasDucking);
     },
 
-    trackPassed() {
+    trackPassed(wasDucking) {
       const trex = runner.tRex;
       for (const obstacle of runner.horizon.obstacles) {
         if (!obstacle.__passed && obstacle.xPos + obstacle.width < trex.xPos) {
@@ -177,7 +199,9 @@
             const duckable = obstacle.yPos >= 60 && obstacle.yPos < 90;
             if (duckable) {
               this.pterodactyls_duckable++;
-              if (trex.ducking) this.pterodactyls_ducked++;
+              // Use the pose from before this frame's action: that is the
+              // pose the game used while the pterodactyl moved past.
+              if (wasDucking) this.pterodactyls_ducked++;
             }
           }
         }
