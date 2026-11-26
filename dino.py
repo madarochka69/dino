@@ -19,6 +19,7 @@ import random
 import shutil
 import sys
 import time
+from itertools import count
 from pathlib import Path
 
 import neat
@@ -394,6 +395,33 @@ def write_pickle(path: Path, payload, open_file=open) -> None:
         pickle.dump(payload, handle, protocol=pickle.HIGHEST_PROTOCOL)
     os.replace(temporary, path)
 
+def max_node_id(population: dict[int, neat.DefaultGenome]) -> int:
+    return max(
+        (max(genome.nodes) for genome in population.values() if genome.nodes),
+        default=-1,
+    )
+
+def prepare_node_indexer(population: dict[int, neat.DefaultGenome], config: neat.Config) -> int:
+    """Make NEAT's node-id counter safe after a checkpoint restore.
+
+    neat-python does not persist ``node_indexer``. On restore it is None, and
+    get_new_node_key() starts from the first mutating genome, which can collide
+    with a higher node id in another genome. Keep a high-water mark instead.
+    """
+    high = max(
+        getattr(config.genome_config, "node_high_water", -1),
+        max_node_id(population),
+        config.genome_config.num_outputs - 1,
+    )
+    config.genome_config.node_indexer = count(high + 1)
+    return high
+
+def update_node_high_water(population: dict[int, neat.DefaultGenome], config: neat.Config) -> None:
+    config.genome_config.node_high_water = max(
+        getattr(config.genome_config, "node_high_water", -1),
+        max_node_id(population),
+    )
+
 def save_checkpoint(population: neat.Population, config: neat.Config) -> None:
     write_pickle(
         CHECKPOINT_PATH,
@@ -638,10 +666,12 @@ async def train(args: argparse.Namespace, config: neat.Config) -> None:
                         print("Fitness threshold reached; stopping.", flush=True)
                         break
 
+                prepare_node_indexer(population.population, config)
                 population.population = population.reproduction.reproduce(
                     config, population.species, config.pop_size, population.generation
                 )
                 keep_best(population.population, global_best, config)
+                update_node_high_water(population.population, config)
 
                 if not population.species.species:
                     print("All species extinct; resetting the population.", flush=True)
@@ -651,6 +681,7 @@ async def train(args: argparse.Namespace, config: neat.Config) -> None:
                         config.genome_type, config.genome_config, config.pop_size
                     )
                     keep_best(population.population, global_best, config)
+                    update_node_high_water(population.population, config)
 
                 population.species.speciate(
                     config, population.population, population.generation

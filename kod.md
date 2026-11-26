@@ -168,6 +168,16 @@ fitness = score
 | 397–402 | `save_checkpoint`: gzip-пикл кортежа `(generation, config, population, species, random state)` — ровно формат `neat.Checkpointer` |
 | 403 | лог с номером поколения |
 
+## Защита `node_indexer` после resume
+
+| Функция | Что делает |
+|---|---|
+| `max_node_id` | максимальный id узла во всей популяции |
+| `prepare_node_indexer` | перед `reproduce` ставит счётчик NEAT выше всех существующих id; нужен после restore, где `node_indexer = None` |
+| `update_node_high_water` | запоминает максимальный id в `config.genome_config.node_high_water`, чтобы после checkpoint restore не переиспользовать старые id |
+
+Без этого `get_new_node_key()` может получить уже занятый id и упасть на `assert new_id not in node_dict`.
+
 ## 405–423. Лучший геном
 
 | Строки | Что происходит |
