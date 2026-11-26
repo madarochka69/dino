@@ -146,12 +146,18 @@
 
       // Mimic the real controls: jump is "hold jump", idle is "release",
       // duck is "duck / speed-drop". Holding jump keeps the jump going.
+      // A speed drop is a one-shot action: setSpeedDrop() resets jumpVelocity
+      // to 1, so calling it every frame would hold the dino in a slow float
+      // instead of letting the native 3x drop accelerate.
       if (action === "jump") {
         if (trex.ducking) trex.setDuck(false);
         if (!trex.jumping) trex.startJump(runner.currentSpeed);
       } else if (action === "duck") {
-        if (trex.jumping) trex.setSpeedDrop();
-        else if (!trex.ducking) trex.setDuck(true);
+        if (trex.jumping) {
+          if (!trex.speedDrop) trex.setSpeedDrop();
+        } else if (!trex.ducking) {
+          trex.setDuck(true);
+        }
       } else {
         if (trex.jumping) trex.endJump();
         else if (trex.ducking) trex.setDuck(false);
@@ -235,15 +241,15 @@
   // network act after every real game frame. Headless Chromium can fire rAF
   // much faster than 60 Hz; without this cap the game's per-frame difficulty
   // ramp would accelerate. This is not a training speed hack and the original
-  // update() still does all game logic. A small tolerance avoids skipping a
-  // frame when a real 60 Hz display fires at 16.6 ms instead of 16.7 ms.
-  const FRAME_MS = 1000 / 60 - 1.0;
+  // update() still does all game logic. The 1 ms look-ahead absorbs normal
+  // 60 Hz jitter without letting the long-term rate exceed 60 updates/s.
+  const FRAME_MS = 1000 / 60;
   let nextFrame = 0;
   const originalUpdate = runner.update.bind(runner);
   runner.update = function () {
     const now = performance.now();
     if (!nextFrame) nextFrame = now;
-    if (now < nextFrame) {
+    if (now + 1.0 < nextFrame) {
       runner.updatePending = false;
       runner.scheduleNextUpdate();
       return;
