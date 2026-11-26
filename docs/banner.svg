@@ -1,0 +1,113 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="340" viewBox="0 0 1200 340" role="img" aria-labelledby="title desc">
+  <title id="title">JOPA DINO — кавайный ниндзя-динозавр на NEAT</title>
+  <desc id="desc">Розово-лавандовый аниме-баннер: чиби-динозавр с повязкой ниндзя, большим мечом и маской гуля.</desc>
+
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffe3f1"/>
+      <stop offset="0.55" stop-color="#f3e2ff"/>
+      <stop offset="1" stop-color="#dff6ff"/>
+    </linearGradient>
+    <linearGradient id="titleGradient" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff5f9e"/>
+      <stop offset="1" stop-color="#ff9f43"/>
+    </linearGradient>
+    <linearGradient id="blade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f2f6fc"/>
+      <stop offset="1" stop-color="#9aa7bd"/>
+    </linearGradient>
+    <path id="petal" d="M0,-8 C6,-5 7,3 0,8 C-7,3 -6,-5 0,-8 Z" fill="#ff9ec4"/>
+  </defs>
+
+  <rect x="8" y="8" width="1184" height="324" rx="28" fill="url(#sky)" stroke="#ffb7d5" stroke-width="3"/>
+  <circle cx="1010" cy="60" r="150" fill="#ffffff" opacity="0.32"/>
+
+  <g opacity="0.85">
+    <use href="#petal" transform="translate(470 58) rotate(18) scale(1.1)"/>
+    <use href="#petal" transform="translate(640 40) rotate(-24) scale(0.8)"/>
+    <use href="#petal" transform="translate(900 96) rotate(42) scale(0.9)"/>
+    <use href="#petal" transform="translate(1120 190) rotate(-14) scale(1.0)"/>
+    <use href="#petal" transform="translate(760 300) rotate(30) scale(0.7)"/>
+    <use href="#petal" transform="translate(560 240) rotate(-38) scale(0.65)"/>
+    <use href="#petal" transform="translate(1030 270) rotate(12) scale(0.8)"/>
+  </g>
+
+  <!-- Меч Берсерка за спиной -->
+  <g>
+    <polygon points="96,52 120,40 214,238 190,252" fill="url(#blade)" stroke="#6f7b90" stroke-width="3"/>
+    <path d="M111,56 L201,242" stroke="#ffffff" stroke-width="4" opacity="0.55"/>
+    <polygon points="78,74 130,48 142,66 90,92" fill="#d9a441" stroke="#a97b24" stroke-width="2"/>
+    <path d="M72,88 L100,72" stroke="#6b4a2f" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="68" cy="91" r="8" fill="#d9a441" stroke="#a97b24" stroke-width="2"/>
+  </g>
+
+  <!-- Хвост и тело -->
+  <path d="M150,255 C110,245 80,255 62,282 C96,292 128,286 158,272 Z" fill="#6cc94a"/>
+  <ellipse cx="250" cy="232" rx="92" ry="66" fill="#7ed957"/>
+  <ellipse cx="262" cy="250" rx="58" ry="38" fill="#d9ffb8"/>
+  <polygon points="178,186 196,150 216,190" fill="#5bb53c"/>
+  <polygon points="214,178 236,140 256,184" fill="#5bb53c"/>
+
+  <!-- Лапы -->
+  <rect x="212" y="278" width="30" height="42" rx="13" fill="#6cc94a"/>
+  <rect x="266" y="278" width="30" height="42" rx="13" fill="#6cc94a"/>
+  <ellipse cx="227" cy="319" rx="19" ry="8" fill="#5bb53c"/>
+  <ellipse cx="281" cy="319" rx="19" ry="8" fill="#5bb53c"/>
+
+  <!-- Голова -->
+  <circle cx="345" cy="150" r="58" fill="#7ed957"/>
+  <rect x="360" y="160" width="72" height="44" rx="20" fill="#7ed957"/>
+  <path d="M356,196 Q392,206 424,194" stroke="#4f8a35" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="408" cy="170" r="3" fill="#4f8a35"/>
+
+  <!-- Глаз -->
+  <circle cx="356" cy="154" r="18" fill="#ffffff"/>
+  <circle cx="362" cy="160" r="8" fill="#263238"/>
+  <circle cx="366" cy="153" r="3" fill="#ffffff"/>
+  <path d="M382,188 Q398,197 414,187" stroke="#3f6b2a" stroke-width="4" fill="none" stroke-linecap="round"/>
+
+  <!-- Повязка ниндзя -->
+  <path d="M290,118 Q340,96 392,120 L388,140 Q340,116 294,136 Z" fill="#ff8c1a"/>
+  <rect x="330" y="105" width="50" height="30" rx="7" fill="#cfd8e6" stroke="#7d899c" stroke-width="2"/>
+  <path d="M340,120 C348,111 360,111 366,119 C372,127 360,131 354,125" stroke="#7d899c" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M300,128 C270,120 250,124 232,138" stroke="#ff8c1a" stroke-width="10" fill="none" stroke-linecap="round"/>
+  <path d="M298,138 C274,136 258,142 246,154" stroke="#ffb45e" stroke-width="8" fill="none" stroke-linecap="round"/>
+
+  <!-- Лапка -->
+  <path d="M315,220 C340,228 352,244 352,258" stroke="#6cc94a" stroke-width="16" fill="none" stroke-linecap="round"/>
+  <path d="M352,258 L362,264 M352,258 L360,270" stroke="#5bb53c" stroke-width="5" stroke-linecap="round"/>
+
+  <!-- Маска гуля -->
+  <g>
+    <path d="M400,245 Q435,225 470,245 Q475,285 435,305 Q395,285 400,245 Z" fill="#f8f8fc" stroke="#c9c9d9" stroke-width="3"/>
+    <circle cx="450" cy="258" r="9" fill="#e63946" stroke="#7a1f27" stroke-width="3"/>
+    <circle cx="450" cy="258" r="2.5" fill="#ffffff"/>
+    <path d="M418,282 Q435,290 452,282" stroke="#b8b8c8" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M430,245 L430,255 M470,268 L480,264" stroke="#b8b8c8" stroke-width="3" stroke-linecap="round"/>
+  </g>
+
+  <!-- Заголовок -->
+  <text x="520" y="106" font-family="Segoe UI, Arial, sans-serif" font-size="62" font-weight="800" fill="url(#titleGradient)" letter-spacing="1">JOPA DINO</text>
+  <text x="523" y="145" font-family="Segoe UI, Arial, sans-serif" font-size="24" fill="#5b4b6b">кавайный ниндзя-динозавр</text>
+  <text x="523" y="178" font-family="Segoe UI, Arial, sans-serif" font-size="17" fill="#8a7898">NEAT × Chrome Dino × real-time</text>
+
+  <!-- Бейджи -->
+  <g font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#5b4b6b">
+    <rect x="520" y="205" width="152" height="36" rx="18" fill="#ffffff" opacity="0.85" stroke="#ffc2dc"/>
+    <text x="596" y="229" text-anchor="middle">12 сенсоров</text>
+    <rect x="686" y="205" width="140" height="36" rx="18" fill="#ffffff" opacity="0.85" stroke="#ffc2dc"/>
+    <text x="756" y="229" text-anchor="middle">3 действия</text>
+    <rect x="840" y="205" width="160" height="36" rx="18" fill="#ffffff" opacity="0.85" stroke="#ffc2dc"/>
+    <text x="920" y="229" text-anchor="middle">15 браузеров</text>
+  </g>
+
+  <text x="523" y="286" font-family="Segoe UI, Arial, sans-serif" font-size="15" fill="#a08cae">0 ручных правил • только нейросеть • даттебайо!</text>
+
+  <!-- Рекорд -->
+  <g font-family="Segoe UI, Arial, sans-serif">
+    <rect x="1010" y="58" width="150" height="112" rx="22" fill="#ffffff" opacity="0.85" stroke="#ffb7d5" stroke-width="2"/>
+    <text x="1085" y="86" font-size="13" fill="#a08cae" text-anchor="middle" letter-spacing="2">РЕКОРД</text>
+    <text x="1085" y="124" font-size="30" font-weight="800" fill="#ff5f9e" text-anchor="middle">19 672</text>
+    <text x="1085" y="148" font-size="12" fill="#8a7898" text-anchor="middle">поколение 66</text>
+  </g>
+</svg>

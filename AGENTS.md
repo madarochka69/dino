@@ -1,0 +1,23 @@
+# AGENTS.md
+
+## What this repo is
+- Chrome Dino (T-Rex Runner) NEAT bot. `dino.py` is the active trainer; `game_agent.js` is injected into the page and evaluates each genome's network in real time. The game is the live page at `https://wayou.github.io/t-rex-runner/`; `game_source.js` is a reference copy that matches the live `index.js`.
+- `neat_dino.py` is legacy (6 inputs/1 output, uses `neat_config_legacy.ini`); don't use it as the entrypoint. `src/jopa/` is a stub package and the `jopa` console script is unrelated to the bot.
+
+## Setup and commands
+- Python 3.13, uv project. Run `uv sync --frozen`; in this workspace `uv` is at `C:\Users\den4i\.local\bin\uv.exe` (not on PATH). Use `.venv\Scripts\python.exe` or `uv run python`.
+- `python dino.py --check` — one random genome in one browser; fastest smoke test.
+- `python dino.py --games 15 --generations 100` — train from scratch in 15 headless Chromium browsers. Each genome plays `--episodes` (default 2) real-time episodes; fitness is the mean shaped score.
+- `python dino.py --resume ...` — continue from `checkpoints/neat-checkpoint.pkl`; the population is re-evaluated with the current fitness. A best genome from an older fitness mode is archived and not reinserted. Other flags: `--visible`, `--visible-games`, `--browser chromium|chrome|msedge`, `--episodes`, `--episode-timeout`.
+- `python dino.py --watch-best` — replay the saved best genome in one large visible window; reloads the file after each episode. Useful while training runs in another terminal. `--episode-timeout 0` means no time limit; the default is 1800 seconds.
+- Browsers are headless by default; add `--visible` to watch them. `--visible` tiles the first `--visible-games` (default 4) windows; the rest still train headless. `--visible-games 1` shows one large game, `--visible-games 15` shows all (small). A fresh run archives a legacy `checkpoints/best_genome.pkl` as `best_genome_legacy_*.pkl`; new-fitness runs overwrite it when they improve.
+- No test suite, lint/typecheck config, or CI exists. Smoke-test changes with `dino.py --check`, and use a throwaway copy of the repo/config for one-generation training tests so real checkpoints are untouched.
+
+## Architecture and quirks
+- Real-time only: `game_agent.js` wraps `runner.update`, caps updates to the game's native 60 FPS (headless Chromium can fire rAF much faster, which would accelerate the per-frame difficulty ramp), and acts after each real game frame. Do not add clock freezing or manual stepping; natural game speed is a requirement.
+- The network is evaluated in-page (tanh + sum) to avoid per-frame Python round-trips. `neat_config.ini` must keep `num_inputs = 12`, `num_outputs = 3`, `activation_options = tanh`, `aggregation_options = sum`; `genome_to_net()` rejects other settings.
+- 15 workers means 15 separate Chromium browsers, one page each. Genomes are distributed through an `asyncio.Queue`; each genome plays `--episodes` episodes and each episode ends on crash or the `--episode-timeout` limit (default 1800s; `0` disables the limit). A lower 300-second limit lands at roughly 5200–5300 points; that stop is expected, not a browser freeze. A timeout prints an explicit `episode timeout` line. Real hangs are caught by an 8-second frame watchdog and an 8-second `page.evaluate` timeout, which restart the browser.
+- Fitness is `ducking-v1`, not raw score: raw episode score plus rewards for ducking under mid-height pterodactyls and penalties for useless ducks/jumps. `game_agent.js` records the per-frame action telemetry in-page. A score-only best genome is not comparable, so `fitness_mode` is saved on best genomes and `keep_best()` only reinserts a matching mode.
+- Persistence: `checkpoints/neat-checkpoint.pkl` is written atomically after every generation and `checkpoints/best_genome.pkl` only when the shaped fitness improves. The checkpoint tuple matches `neat.Checkpointer.restore_checkpoint`. `keep_best()` re-inserts the saved best each generation because NEAT's species elitism alone can lose a global best when its species stagnates. `checkpoints/history.csv` records per-generation best/mean score and fitness, duck percentage, pterodactyl counts, species and global-best values; an old-format history file is renamed to `history_legacy_*.csv` on the next run.
+- Default browser is Playwright `chromium`. If its install is broken, use `--browser chrome` for installed Google Chrome. The game requires network access.
+- `game_source.js` is not loaded at runtime; editing it has no effect. `q_table.npy` and `winner_genome.pkl` are unused by `dino.py`.

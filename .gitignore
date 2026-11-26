@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+
+# Local IDE settings
+.vscode/
+
+# Training artifacts: keep the canonical checkpoint/best/history, ignore backups
+checkpoints/*.tmp
+checkpoints/neat-checkpoint-gen*.pkl
+checkpoints/best_genome_*.pkl
+
+# Old experiments, not used by dino.py
+q_table.npy
+winner_genome.pkl
+
+# OS noise
+Thumbs.db
+.DS_Store

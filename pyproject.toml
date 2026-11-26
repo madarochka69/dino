@@ -1,0 +1,21 @@
+[project]
+name = "jopa"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "madarochka", email = "den4ik.d.s@icloud.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "neat-python>=2.0.0",
+    "numpy>=2.5.5",
+    "playwright>=1.65.2",
+]
+
+[project.scripts]
+jopa = "jopa:main"
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"
