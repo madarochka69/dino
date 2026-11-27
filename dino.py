@@ -35,17 +35,20 @@ BEST_PATH = CHECKPOINT_DIR / "best_genome.pkl"
 HISTORY_PATH = CHECKPOINT_DIR / "history.csv"
 
 # The score-only fitness rewards a degenerate policy: duck forever and jump
-# when an obstacle gets close. This shaped fitness adds small rewards for the
+# when an obstacle gets close. This shaped fitness adds rewards for the
 # actions that keep the dino alive. Useful duck frames only count within 200 px
-# and pass credit uses the pre-action pose; PTERO_DUCK_BONUS is per mid-height
-# pterodactyl. --episode-timeout defaults to 1800s (about 35k points); a 300s
-# run ends near 5280 points, which is the episode limit, not a freeze.
-FITNESS_MODE = "ducking-v2"
+# and pass credit uses the pre-action pose. v3 pays per duckable pterodactyl:
+# a large bonus for passing it while ducking and a penalty for jumping over it,
+# otherwise a jump-only policy is a local optimum and never learns to duck.
+# --episode-timeout defaults to 1800s (about 35k points); a 300s run ends near
+# 5280 points, which is the episode limit, not a freeze.
+FITNESS_MODE = "ducking-v3"
 DUCK_REWARD_PER_FRAME = 2.0
-USELESS_DUCK_PENALTY_PER_FRAME = 0.25
+USELESS_DUCK_PENALTY_PER_FRAME = 0.1
 BAD_JUMP_PENALTY_PER_FRAME = 0.5
 USELESS_JUMP_PENALTY_PER_FRAME = 0.05
-PTERO_DUCK_BONUS = 50.0
+PTERO_DUCK_BONUS = 200.0
+PTERO_MISS_PENALTY = 40.0
 STALL_SECONDS = 8.0
 EVALUATE_TIMEOUT = 8.0
 
@@ -313,6 +316,10 @@ def shaped_fitness(result: dict) -> float:
     def get(key: str) -> int:
         return int(result.get(key, 0))
 
+    missed_duckable = max(
+        0,
+        get("pterodactyls_duckable") - get("pterodactyls_ducked"),
+    )
     return (
         float(result.get("score", 0))
         + DUCK_REWARD_PER_FRAME * get("useful_duck_frames")
@@ -320,6 +327,7 @@ def shaped_fitness(result: dict) -> float:
         - BAD_JUMP_PENALTY_PER_FRAME * get("bad_jump_frames")
         - USELESS_JUMP_PENALTY_PER_FRAME * get("useless_jump_frames")
         + PTERO_DUCK_BONUS * get("pterodactyls_ducked")
+        - PTERO_MISS_PENALTY * missed_duckable
     )
 
 async def evaluate_population(
