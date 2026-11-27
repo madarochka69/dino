@@ -32,6 +32,8 @@
     net: null,
     active: false,
     done: false,
+    timed_out: false,
+    maxSeconds: 0,
     started: 0,
     frames: 0,
     passed: 0,
@@ -53,13 +55,18 @@
         : Math.round(raw);
     },
 
+    elapsedSeconds() {
+      return this.started ? (performance.now() - this.started) / 1000 : 0;
+    },
+
     snapshot() {
       return {
         done: this.done,
+        timed_out: this.timed_out,
         score: this.score(),
         passed: this.passed,
         frames: this.frames,
-        elapsed: this.started ? (performance.now() - this.started) / 1000 : 0,
+        elapsed: this.elapsedSeconds(),
         crashed: !!runner.crashed,
         last_action: this.last_action,
         jump_frames: this.action_counts.jump,
@@ -213,10 +220,12 @@
       this.done = true;
     },
 
-    start(net) {
+    resetRun(net) {
       this.net = net;
       this.active = false;
       this.done = false;
+      this.timed_out = false;
+      this.maxSeconds = 0;
       this.started = performance.now();
       this.frames = 0;
       this.passed = 0;
@@ -230,7 +239,8 @@
       this.pterodactyls_duckable = 0;
       this.pterodactyls_ducked = 0;
 
-      // Start a clean real-time game. No clock freezing or frame stepping.
+      // Start a clean game. No clock freezing or frame stepping in normal
+      // mode; fastStart() opts into the fixed-step simulator explicitly.
       runner.stop();
       runner.activated = true;
       runner.playingIntro = false;
@@ -239,8 +249,9 @@
       runner.tRex.playingIntro = false;
       runner.tRex.xPos = runner.tRex.config.START_X_POS;
       this.active = true;
-      runner.restart();
+    },
 
+    setupContainer() {
       // Normal play reaches this through playIntro/startGame. We skip the
       // intro so every genome starts instantly. Do the same container setup
       // and arcade-mode scaling the intro would have done, otherwise the
@@ -252,6 +263,78 @@
       if (runner.setArcadeMode) runner.setArcadeMode();
       const messageBox = document.getElementById("messageBox");
       if (messageBox) messageBox.style.display = "none";
+    },
+
+    start(net) {
+      this.resetRun(net);
+      runner.restart();
+      this.setupContainer();
+    },
+
+    installFastMode() {
+      if (this.fastInstalled) return;
+      this.fastInstalled = true;
+      const context = window.CanvasRenderingContext2D &&
+        window.CanvasRenderingContext2D.prototype;
+      if (!context) return;
+      // Drawing is presentation only. Skipping it does not touch game state,
+      // collision boxes, obstacle spawning or the speed ramp.
+      const drawCalls = [
+        "clearRect", "drawImage", "fillRect", "fillText", "strokeRect",
+        "beginPath", "moveTo", "lineTo", "stroke", "save", "restore",
+        "scale", "translate",
+      ];
+      for (const name of drawCalls) {
+        if (typeof context[name] === "function") context[name] = function () {};
+      }
+    },
+
+    fastStart(net, maxSeconds) {
+      this.installFastMode();
+      virtualNow = 1000;
+      performance.now = () => virtualNow;
+      this.resetRun(net);
+      this.maxSeconds = maxSeconds > 0 ? maxSeconds : 0;
+      // The game's native update uses performance.now() for deltaTime. With
+      // the virtual clock above, each manual update advances exactly one
+      // native 60 Hz frame; the network still acts after every game frame.
+      runner.update = originalUpdate;
+      runner.scheduleNextUpdate = () => {};
+      this.active = true;
+      runner.restart();
+      this.step(); // match the normal wrapper's post-restart step
+      this.setupContainer();
+      return this.snapshot();
+    },
+
+    fastRun(frames) {
+      if (!this.active) return this.snapshot();
+      let steps = 0;
+      while (steps < frames && this.active) {
+        if (this.maxSeconds > 0 && this.elapsedSeconds() >= this.maxSeconds) {
+          this.timed_out = true;
+          this.finish();
+          runner.stop();
+          break;
+        }
+        virtualNow += FRAME_MS;
+        runner.update();
+        this.step();
+        steps++;
+        if (this.maxSeconds > 0 && this.elapsedSeconds() >= this.maxSeconds) {
+          this.timed_out = true;
+          this.finish();
+          runner.stop();
+          break;
+        }
+      }
+      if (this.active && this.maxSeconds > 0 &&
+          this.elapsedSeconds() >= this.maxSeconds) {
+        this.timed_out = true;
+        this.finish();
+        runner.stop();
+      }
+      return this.snapshot();
     },
 
     stop() {
@@ -268,6 +351,7 @@
   // update() still does all game logic. The 1 ms look-ahead absorbs normal
   // 60 Hz jitter without letting the long-term rate exceed 60 updates/s.
   const FRAME_MS = 1000 / 60;
+  let virtualNow = 0;
   let nextFrame = 0;
   const originalUpdate = runner.update.bind(runner);
   runner.update = function () {

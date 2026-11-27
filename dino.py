@@ -51,6 +51,9 @@ PTERO_DUCK_BONUS = 200.0
 PTERO_MISS_PENALTY = 40.0
 STALL_SECONDS = 8.0
 EVALUATE_TIMEOUT = 8.0
+FAST_BATCH_FRAMES = 1200
+FAST_EVALUATE_TIMEOUT = 30.0
+FAST_WALL_STALL_SECONDS = 30.0
 
 GAME_URL = "https://wayou.github.io/t-rex-runner/"
 READY_JS = (
@@ -161,11 +164,13 @@ class Worker:
         channel: str,
         viewport: dict | None = None,
         window_args: list[str] | None = None,
+        fast: bool = False,
     ) -> None:
         self.index, self.playwright = index, playwright
         self.headless, self.channel = headless, channel
         self.viewport = viewport or VIEWPORT
         self.window_args = list(window_args or [])
+        self.fast = fast
         self.browser = self.page = None
 
     def log(self, message: str) -> None:
@@ -221,6 +226,8 @@ class Worker:
         return await asyncio.wait_for(call, timeout=timeout or EVALUATE_TIMEOUT)
 
     async def play(self, net: dict, timeout: float) -> dict:
+        if self.fast:
+            return await self.play_fast(net, timeout)
         await self.evaluate("(net) => window.__dinoAgent.start(net)", net)
         started = time.monotonic()
         unlimited = timeout <= 0
@@ -284,8 +291,65 @@ class Worker:
                 self.log(f"score {state['score']}")
                 next_report += 5.0
 
+    async def play_fast(self, net: dict, timeout: float) -> dict:
+        """Play one episode in the fixed-step in-page simulator."""
+        await self.evaluate(
+            "(args) => window.__dinoAgent.fastStart(args.net, args.seconds)",
+            {"net": net, "seconds": timeout},
+            timeout=EVALUATE_TIMEOUT,
+        )
+        started = time.monotonic()
+        last_progress = started
+        last_state = {
+            "done": False, "score": 0, "passed": 0, "frames": 0,
+            "elapsed": 0.0, "crashed": False, "timed_out": False,
+        }
+
+        def stalled_result(state: dict) -> dict:
+            return {
+                **state,
+                "done": True,
+                "crashed": False,
+                "stalled": True,
+                "timed_out": False,
+                "failed": True,
+            }
+
+        while True:
+            try:
+                state = await self.evaluate(
+                    "(frames) => window.__dinoAgent.fastRun(frames)",
+                    FAST_BATCH_FRAMES,
+                    timeout=FAST_EVALUATE_TIMEOUT,
+                )
+            except asyncio.TimeoutError:
+                self.log(f"fast page unresponsive at score {last_state['score']}")
+                await self.safe_reset()
+                return stalled_result(last_state)
+            except Exception as error:
+                self.log(f"fast simulator error: {error}")
+                await self.safe_reset()
+                return stalled_result(last_state)
+
+            if state.get("done") or state.get("crashed") or state.get("timed_out"):
+                state.setdefault("stalled", False)
+                state.setdefault("failed", False)
+                state.setdefault("timed_out", False)
+                return state
+
+            now = time.monotonic()
+            if state.get("frames") != last_state.get("frames"):
+                last_progress = now
+            last_state = state
+
+            if now - last_progress >= FAST_WALL_STALL_SECONDS:
+                self.log(f"fast simulator stalled at score {state['score']}")
+                await self.safe_reset()
+                return stalled_result(state)
+
 async def start_workers(
-    playwright, count: int, visible: bool, channel: str, visible_count: int = 0
+    playwright, count: int, visible: bool, channel: str, visible_count: int = 0,
+    fast: bool = False,
 ) -> list[Worker]:
     visible_count = max(0, min(visible_count, count)) if visible else 0
     layout = tile_layout(visible_count)
@@ -300,6 +364,7 @@ async def start_workers(
                 channel=channel,
                 viewport=viewport,
                 window_args=window_args,
+                fast=fast,
             )
             await worker.open()
             workers.append(worker)
@@ -606,12 +671,17 @@ async def train(args: argparse.Namespace, config: neat.Config) -> None:
                 flush=True,
             )
 
+    fast = bool(getattr(args, "fast", False))
+    if fast and args.visible:
+        print("  Fast-sim disables rendering; visible windows are disabled.", flush=True)
+    visible = args.visible and not fast
     worker_count = max(1, min(args.games, config.pop_size))
-    visible_count = max(1, min(args.visible_games, worker_count)) if args.visible else 0
+    visible_count = max(1, min(args.visible_games, worker_count)) if visible else 0
+    mode = "fast-sim fixed 60 Hz, rendering off" if fast else "real-time"
     print(
         f"Workers: {worker_count} {args.browser} browsers "
         f"({visible_count} visible, {worker_count - visible_count} headless), "
-        f"population: {config.pop_size}, generations: {args.generations}.",
+        f"mode: {mode}, population: {config.pop_size}, generations: {args.generations}.",
         flush=True,
     )
     if visible_count:
@@ -623,7 +693,7 @@ async def train(args: argparse.Namespace, config: neat.Config) -> None:
 
     async with async_playwright() as playwright:
         workers = await start_workers(
-            playwright, worker_count, args.visible, args.browser, visible_count
+            playwright, worker_count, visible, args.browser, visible_count, fast=fast
         )
         try:
             while population.generation < args.generations:
@@ -778,6 +848,7 @@ FLAGS = [
     ("--episode-timeout", dict(type=float, default=1800.0, help="maximum seconds per episode; 0 = no limit (default: 1800, about 35k points)")),
     ("--episodes", dict(type=int, default=3, help="episodes per genome, averaged to reduce luck; use 2 for a faster but noisier run (default: 3)")),
     ("--visible", dict(action="store_true", help="show browser windows (only the first --visible-games are visible)")),
+    ("--fast", dict(action="store_true", help="fixed-step accelerated simulator: 60 updates per simulated second, rendering off")),
     ("--visible-games", dict(type=int, default=4, help="number of games to show when --visible is used (default: 4)")),
     ("--browser", dict(choices=("chromium", "chrome", "msedge"), default="chromium", help="browser channel: Playwright chromium, installed Chrome or Edge")),
     ("--config", dict(type=Path, default=CONFIG_PATH, help=f"NEAT config file (default: {CONFIG_PATH})")),
